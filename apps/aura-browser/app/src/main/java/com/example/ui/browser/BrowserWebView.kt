@@ -14,7 +14,6 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.webkit.SslErrorHandler
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -212,25 +211,6 @@ fun BrowserWebView(
                         )
                     )
                 }
-            }
-
-            override fun onReceivedSslError(
-                view: WebView?,
-                handler: SslErrorHandler?,
-                error: android.webkit.SslError?
-            ) {
-                super.onReceivedSslError(view, handler, error)
-                Log.e(TAG, "SSL error: ${error?.primaryError}")
-                // Chrome policy: don't auto-proceed on SSL errors unless user explicitly requests
-                handler?.cancel()
-                onError(
-                    BrowserError(
-                        errorType = "SSL",
-                        errorCode = -2,
-                        description = "Certificate error: ${error?.primaryError}",
-                        failingUrl = error?.url ?: ""
-                    )
-                )
             }
 
             override fun shouldOverrideUrlLoading(
