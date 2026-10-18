@@ -4,6 +4,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -345,6 +349,19 @@ fun BrowserHomePage(
                 "Current Engine: ${searchEngine.displayNameEn} (Encrypted)",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        var tapCount by remember { mutableIntStateOf(0) }
+        Text(
+            text = "BUILD v1.0.3 (stable sig) — Taps: $tapCount",
+            style = MaterialTheme.typography.bodySmall,
+            color = PrimaryCyan,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { tapCount += 1 }
+                .padding(8.dp)
         )
     }
 }
