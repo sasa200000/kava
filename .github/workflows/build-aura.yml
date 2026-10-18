@@ -50,7 +50,7 @@ jobs:
           git config user.name "Hermes CI"
           git config user.email "hermes@kava.ai"
           mkdir -p releases
-          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          APK=$(find apps/aura-browser/app/build/outputs/apk/debug -name "*.apk" | head -1)
           cp "$APK" releases/aura-browser-debug.apk
           git add releases/aura-browser-debug.apk
           git commit -m "APK $(date -u +%Y%m%d-%H%M%S)" || true
