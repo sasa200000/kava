@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.pointerInput
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,7 +73,7 @@ fun EdgeLightingOverlay(
         label = "pulse"
     )
 
-    Canvas(modifier = modifier.fillMaxSize()) {
+    Canvas(modifier = modifier.fillMaxSize().pointerInput(Unit) {}) {
         val width = size.width
         val height = size.height
         val strokeWidthPx = config.strokeWidthDp.dp.toPx()
