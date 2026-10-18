@@ -2,7 +2,6 @@ package com.example.ui.browser
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.os.Build
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
@@ -19,9 +18,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -29,12 +29,8 @@ import com.example.data.model.ActiveDownload
 import com.example.data.model.BrowserTab
 import com.example.downloader.DownloadHelper
 import com.example.security.SecurityEngine
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
-private const val DESKTOP_USER_AGENT =
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-
+private const val DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 private const val TAG = "AuraWebView"
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -55,9 +51,8 @@ fun BrowserWebView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
-    // Create WebView and keep stable reference
+    // ── Stable WebView reference created ONCE ──────────────────────────────────
     val webView = remember {
         WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -67,90 +62,43 @@ fun BrowserWebView(
         }
     }
 
-    // Configure WebSettings — full Chrome-like support for ALL sites
-    LaunchedEffect(tab.isDesktopMode) {
-        val settings = webView.settings
+    // ── Configure ALL settings SYNCHRONOUSLY — fires before first composition ─
+    val settings = remember { webView.settings }
+    settings.javaScriptEnabled = true
+    settings.domStorageEnabled = true
+    settings.databaseEnabled = true
+    settings.useWideViewPort = true
+    settings.loadWithOverviewMode = true
+    settings.setSupportZoom(true)
+    settings.builtInZoomControls = true
+    settings.displayZoomControls = false
+    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+    settings.allowContentAccess = true
+    settings.allowFileAccess = true
+    settings.mediaPlaybackRequiresUserGesture = false
+    settings.cacheMode = WebSettings.LOAD_DEFAULT
+    settings.javaScriptCanOpenWindowsAutomatically = true
+    CookieManager.getInstance().setAcceptCookie(true)
+    CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
-        // Core rendering
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-
-        // Viewport — proper responsive rendering
-        settings.useWideViewPort = true
-        settings.loadWithOverviewMode = true
-
-        // Zoom controls
-        settings.setSupportZoom(true)
-        settings.builtInZoomControls = true
-        settings.displayZoomControls = false
-
-        // Allow mixed content (HTTP resources on HTTPS pages) — like Chrome
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-
-        // Allow content/file access
-        settings.allowContentAccess = true
-        settings.allowFileAccess = true
-
-        // Media playback
-        settings.mediaPlaybackRequiresUserGesture = false
-
-        // Cache
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
-
-        // Popups
-        settings.javaScriptCanOpenWindowsAutomatically = true
-
-        // Third-party cookies
-        CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
-
-        // User agent
-        if (tab.isDesktopMode) {
-            settings.userAgentString = DESKTOP_USER_AGENT
-        } else {
-            settings.userAgentString = null // Use default mobile UA
-        }
+    // ── User agent: update only when mode changes ──────────────────────────────
+    val currentDesktopMode = remember { mutableStateOf(tab.isDesktopMode) }
+    if (tab.isDesktopMode != currentDesktopMode.value) {
+        currentDesktopMode.value = tab.isDesktopMode
+        settings.userAgentString = if (tab.isDesktopMode) DESKTOP_UA else ""
     }
 
-    // Handle system back button
-    BackHandler(enabled = webView.canGoBack()) {
-        webView.goBack()
-    }
-
-    // React to navigation requests (from address bar or home page shortcuts)
-    LaunchedEffect(navigationRequest) {
-        if (!navigationRequest.isNullOrBlank()) {
-            var urlToLoad = navigationRequest
-
-            // Force HTTPS for http:// URLs (only apply here — user typed address)
-            if (forceHttps && urlToLoad.startsWith("http://")) {
-                urlToLoad = urlToLoad.replaceFirst("http://", "https://")
-            }
-
-            Log.d(TAG, "Loading URL from navigationRequest: $urlToLoad")
-            onLoadUrl(urlToLoad)
-            webView.loadUrl(urlToLoad)
-            onNavigationHandled()
-        }
-    }
-
-    DisposableEffect(webView) {
-        // WebViewClient — handles page lifecycle, error reporting + ad blocking
+    // ── WebViewClient — set ONCE when WebView first created ─────────────────────
+    remember {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
-                view: WebView?,
-                request: WebResourceRequest?
+                view: WebView?, request: WebResourceRequest?
             ): WebResourceResponse? {
                 val reqUrl = request?.url?.toString()
-                // Log every request for debugging
-                Log.d(TAG, "REQ: ${request?.url} isMain=${request?.isForMainFrame}")
-                // Block known trackers if adBlocker is enabled
+                Log.d(TAG, "REQ: ${request?.url} main=${request?.isForMainFrame}")
                 if (adBlockerEnabled && SecurityEngine.shouldBlockUrl(reqUrl)) {
                     Log.d(TAG, "BLOCKED: $reqUrl")
-                    scope.launch(Dispatchers.Main) {
-                        onTrackerBlocked()
-                    }
+                    onTrackerBlocked()
                     return SecurityEngine.createEmptyBlockedResponse()
                 }
                 return super.shouldInterceptRequest(view, request)
@@ -170,98 +118,90 @@ fun BrowserWebView(
             }
 
             override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
+                view: WebView?, request: WebResourceRequest?,
                 error: WebResourceError?
             ) {
                 super.onReceivedError(view, request, error)
+                val code = error?.errorCode ?: -1
                 val desc = error?.description?.toString() ?: "unknown"
-                val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) error?.errorCode ?: -1 else -1
-                Log.e(TAG, "onReceivedError code=$code desc=$desc url=${request?.url}")
+                Log.e(TAG, "ERROR $code: $desc url=${request?.url}")
                 if (request?.isForMainFrame == true) {
                     view?.stopLoading()
-                    onError(
-                        BrowserError(
-                            errorType = "ERROR",
-                            errorCode = code,
-                            description = desc,
-                            failingUrl = request?.url?.toString() ?: ""
-                        )
-                    )
+                    onError(BrowserError("ERROR", code, desc, request?.url?.toString() ?: ""))
                 }
             }
 
             override fun onReceivedHttpError(
-                view: WebView?,
-                request: WebResourceRequest?,
+                view: WebView?, request: WebResourceRequest?,
                 errorResponse: WebResourceResponse?
             ) {
                 super.onReceivedHttpError(view, request, errorResponse)
                 val code = errorResponse?.statusCode ?: -1
-                Log.e(TAG, "onReceivedHttpError code=$code url=${request?.url}")
+                Log.e(TAG, "HTTP $code: ${errorResponse?.reasonPhrase} url=${request?.url}")
                 if (request?.isForMainFrame == true) {
-                    onError(
-                        BrowserError(
-                            errorType = "HTTP",
-                            errorCode = code,
-                            description = "HTTP ${errorResponse?.reasonPhrase ?: code}",
-                            failingUrl = request?.url?.toString() ?: ""
-                        )
-                    )
+                    onError(BrowserError("HTTP", code, "HTTP ${errorResponse?.reasonPhrase}", request?.url?.toString() ?: ""))
                 }
             }
 
             override fun shouldOverrideUrlLoading(
-                view: WebView?,
-                request: WebResourceRequest?
-            ): Boolean {
-                val url = request?.url?.toString() ?: return false
-                Log.d(TAG, "shouldOverrideUrlLoading: $url isMain=${request?.isForMainFrame}")
-                // Don't override — load directly in WebView
-                return false
-            }
+                view: WebView?, request: WebResourceRequest?
+            ): Boolean = false
         }
 
-        // WebChromeClient — progress bar + title + console logs
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
-                Log.d(TAG, "progress: $newProgress url=${view?.url}")
+                Log.d(TAG, "progress=$newProgress url=${view?.url}")
                 onProgressChanged(newProgress)
             }
 
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 super.onReceivedTitle(view, title)
-                val currentUrl = view?.url ?: ""
-                Log.d(TAG, "onReceivedTitle: $title url=$currentUrl")
-                onPageFinished(currentUrl, title)
+                val url = view?.url ?: ""
+                Log.d(TAG, "title=$title url=$url")
+                onPageFinished(url, title)
             }
 
-            override fun onConsoleMessage(message: ConsoleMessage?): Boolean {
-                Log.d(TAG, "console: ${message?.message()}")
+            override fun onConsoleMessage(msg: ConsoleMessage?): Boolean {
+                Log.d(TAG, "console: ${msg?.message()}")
                 return true
             }
         }
 
-        // File downloads via system DownloadManager
-        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
-            Log.d(TAG, "download: $url $mimeType")
+        webView.setDownloadListener { url, ua, cd, mt, _ ->
+            Log.d(TAG, "download: $url")
             DownloadHelper.startSystemDownload(
                 context = context,
-                url = url,
-                userAgent = userAgent,
-                contentDisposition = contentDisposition,
-                mimeType = mimeType,
-                scope = scope,
+                url = url, userAgent = ua,
+                contentDisposition = cd, mimeType = mt,
+                scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main),
                 onDownloadStarted = onDownloadStarted
             )
         }
-
-        onDispose {
-            // Clean up WebView on dispose
-        }
     }
 
+    // ── Back button ────────────────────────────────────────────────────────────
+    BackHandler(enabled = webView.canGoBack()) {
+        webView.goBack()
+    }
+
+    // ── Navigation: fires when navigationRequest changes ────────────────────────
+    DisposableEffect(navigationRequest) {
+        Log.d(TAG, "DisposableEffect navRequest=$navigationRequest")
+        if (!navigationRequest.isNullOrBlank()) {
+            var url = navigationRequest
+            if (forceHttps && url.startsWith("http://")) {
+                url = "https://" + url.substring(7)
+            }
+            Log.d(TAG, "loadUrl: $url webView.url=${webView.url}")
+            onLoadUrl(url)
+            webView.loadUrl(url)      // ← THE ACTUAL LOAD
+            onNavigationHandled()
+        }
+        onDispose { }
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────────
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             factory = { webView },
