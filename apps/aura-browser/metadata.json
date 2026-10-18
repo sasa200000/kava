@@ -1,0 +1,6 @@
+{
+  "name": "Aura Browser",
+  "description": "A high-security, anti-hack web browser with dynamic RGB edge lighting, 7-color neon theme, multi-engine search, tab management, and advanced download support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

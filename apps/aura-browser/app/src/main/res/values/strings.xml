@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Aura Browser</string>
+    <string name="search_or_enter_url">Search or enter web address…</string>
+    <string name="new_tab">New Tab</string>
+    <string name="close_tab">Close Tab</string>
+    <string name="tabs">Tabs</string>
+    <string name="bookmarks">Bookmarks</string>
+    <string name="history">History</string>
+    <string name="downloads">Downloads</string>
+    <string name="settings">Settings</string>
+    <string name="security_shield">Security Shield</string>
+    <string name="anti_hack_protection">Anti-Hack &amp; Privacy</string>
+    <string name="edge_lighting">Edge Lighting Dance</string>
+    <string name="incognito_mode">Incognito Mode</string>
+    <string name="desktop_site">Desktop Site</string>
+    <string name="clear_history">Clear History</string>
+    <string name="add_to_bookmarks">Add to Bookmarks</string>
+    <string name="share_page">Share Page</string>
+    <string name="reload">Reload</string>
+    <string name="blocked_trackers">Trackers Blocked</string>
+    <string name="connection_secure">Connection is Secure (HTTPS)</string>
+    <string name="connection_insecure">Warning: Insecure Connection (HTTP)</string>
+    <string name="search_engine">Search Engine</string>
+    <string name="language">Language</string>
+</resources>

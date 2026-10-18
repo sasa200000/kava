@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">آئورا بروزر</string>
+    <string name="search_or_enter_url">جستجو یا وارد کردن آدرس وب…</string>
+    <string name="new_tab">برگه جدید</string>
+    <string name="close_tab">بستن برگه</string>
+    <string name="tabs">برگه‌ها</string>
+    <string name="bookmarks">نشانک‌ها</string>
+    <string name="history">تاریخچه</string>
+    <string name="downloads">دانلودها</string>
+    <string name="settings">تنظیمات</string>
+    <string name="security_shield">سپر امنیتی</string>
+    <string name="anti_hack_protection">ضد هک و حریم خصوصی</string>
+    <string name="edge_lighting">رقص نور لبه صفحه</string>
+    <string name="incognito_mode">حالت ناشناس (مخفی)</string>
+    <string name="desktop_site">نسخه رایانه (دسکتاپ)</string>
+    <string name="clear_history">پاکسازی تاریخچه</string>
+    <string name="add_to_bookmarks">افزودن به نشانک‌ها</string>
+    <string name="share_page">اشتراک‌گذاری صفحه</string>
+    <string name="reload">تازه‌سازی</string>
+    <string name="blocked_trackers">ردیاب‌های مسدود شده</string>
+    <string name="connection_secure">اتصال امن است (HTTPS)</string>
+    <string name="connection_insecure">هشدار: اتصال ناامن است (HTTP)</string>
+    <string name="search_engine">موتور جستجو</string>
+    <string name="language">زبان</string>
+</resources>

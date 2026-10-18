@@ -1,0 +1,41 @@
+package com.example.ui.i18n
+
+import com.example.data.model.AppLanguage
+
+object AppStrings {
+
+    fun searchOrEnterUrl(lang: AppLanguage) = if (lang == AppLanguage.FA) "جستجو یا آدرس سایت…" else "Search or type URL…"
+    fun newTab(lang: AppLanguage) = if (lang == AppLanguage.FA) "برگه جدید" else "New Tab"
+    fun incognitoTab(lang: AppLanguage) = if (lang == AppLanguage.FA) "برگه ناشناس (ضد ردگیری)" else "Incognito Tab (No Trace)"
+    fun tabs(lang: AppLanguage) = if (lang == AppLanguage.FA) "برگه‌ها" else "Tabs"
+    fun bookmarks(lang: AppLanguage) = if (lang == AppLanguage.FA) "نشانک‌ها" else "Bookmarks"
+    fun history(lang: AppLanguage) = if (lang == AppLanguage.FA) "تاریخچه" else "History"
+    fun downloads(lang: AppLanguage) = if (lang == AppLanguage.FA) "دانلودها" else "Downloads"
+    fun settings(lang: AppLanguage) = if (lang == AppLanguage.FA) "تنظیمات" else "Settings"
+    fun securityShield(lang: AppLanguage) = if (lang == AppLanguage.FA) "سپر ضد هک و امنیت" else "Security & Anti-Hack Shield"
+    fun edgeLighting(lang: AppLanguage) = if (lang == AppLanguage.FA) "رقص نور دورتادور صفحه" else "Edge Lighting Dance"
+    fun desktopMode(lang: AppLanguage) = if (lang == AppLanguage.FA) "نسخه رایانه (دسکتاپ)" else "Desktop Site"
+    fun clearData(lang: AppLanguage) = if (lang == AppLanguage.FA) "پاکسازی ردپا و کوکی‌ها" else "Clear Data & Traces"
+    fun trackersBlocked(lang: AppLanguage) = if (lang == AppLanguage.FA) "ردیاب مسدود شده" else "Trackers Blocked"
+    fun secureHttps(lang: AppLanguage) = if (lang == AppLanguage.FA) "اتصال کاملاً امن (رمزنگاری TLS 1.3)" else "Secure Connection (TLS 1.3)"
+    fun connectionInsecure(lang: AppLanguage) = if (lang == AppLanguage.FA) "هشدار: اتصال ناامن است (HTTP)" else "Warning: Insecure Connection (HTTP)"
+    fun searchEngine(lang: AppLanguage) = if (lang == AppLanguage.FA) "موتور جستجوی پیش‌فرض" else "Default Search Engine"
+    fun language(lang: AppLanguage) = if (lang == AppLanguage.FA) "زبان برنامه" else "App Language"
+    fun speed(lang: AppLanguage) = if (lang == AppLanguage.FA) "سرعت رقص نور" else "Lighting Speed"
+    fun pattern(lang: AppLanguage) = if (lang == AppLanguage.FA) "طرح رقص نور" else "Lighting Pattern"
+    fun strokeWidth(lang: AppLanguage) = if (lang == AppLanguage.FA) "ضخامت خط نور" else "Border Thickness"
+    fun trigger(lang: AppLanguage) = if (lang == AppLanguage.FA) "شرط فعال‌سازی رقص نور" else "Lighting Trigger"
+    fun adBlocker(lang: AppLanguage) = if (lang == AppLanguage.FA) "مسدودکننده تبلیغات و ردیاب‌ها" else "Ad & Tracker Blocker"
+    fun antiPhishing(lang: AppLanguage) = if (lang == AppLanguage.FA) "شناسایی سایت‌های فیشینگ و مخرب" else "Anti-Phishing & Malware Guard"
+    fun forceHttps(lang: AppLanguage) = if (lang == AppLanguage.FA) "ارتقای خودکار به HTTPS امن" else "Force HTTPS Everywhere"
+    fun antiFingerprint(lang: AppLanguage) = if (lang == AppLanguage.FA) "سپر ضد ردپای دیجیتال (Anti-Fingerprint)" else "Anti-Fingerprint Shield"
+    fun emptyHistory(lang: AppLanguage) = if (lang == AppLanguage.FA) "هیچ تاریخچه‌ای ثبت نشده است." else "No history recorded yet."
+    fun emptyBookmarks(lang: AppLanguage) = if (lang == AppLanguage.FA) "نشانکی ذخیره نشده است." else "No bookmarks saved."
+    fun emptyDownloads(lang: AppLanguage) = if (lang == AppLanguage.FA) "فایلی برای نمایش در لیست دانلود نیست." else "No downloads in queue."
+    fun addToBookmarks(lang: AppLanguage) = if (lang == AppLanguage.FA) "افزودن به نشانک‌ها" else "Add Bookmark"
+    fun bookmarked(lang: AppLanguage) = if (lang == AppLanguage.FA) "نشانک شد!" else "Bookmarked!"
+    fun share(lang: AppLanguage) = if (lang == AppLanguage.FA) "اشتراک‌گذاری" else "Share"
+    fun quickShortcuts(lang: AppLanguage) = if (lang == AppLanguage.FA) "دسترسی سریع" else "Quick Shortcuts"
+    fun home(lang: AppLanguage) = if (lang == AppLanguage.FA) "خانه" else "Home"
+    fun openFile(lang: AppLanguage) = if (lang == AppLanguage.FA) "باز کردن فایل" else "Open File"
+}
