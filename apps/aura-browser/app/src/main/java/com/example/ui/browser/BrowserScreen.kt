@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import com.example.data.model.AppLanguage
-import com.example.ui.edgelighting.EdgeLightingOverlay
 
 private const val TAG = "AuraBrowserScreen"
 
@@ -144,13 +143,6 @@ fun BrowserScreen(
                     }
                 }
             }
-
-            // High-Performance Multi-Pattern Edge Lighting Overlay on top of screen
-            EdgeLightingOverlay(
-                config = edgeLightingConfig,
-                isPageLoading = currentTab.isLoading,
-                isDownloading = activeDownloads.isNotEmpty()
-            )
 
             // Modal Sheets
             if (showTabsSheet) {

@@ -27,6 +27,6 @@ data class EdgeLightingConfig(
     val speed: EdgeLightingSpeed = EdgeLightingSpeed.NORMAL,
     val strokeWidthDp: Float = 6f, // 3f, 6f, 10f
     val cornerRadiusDp: Float = 28f,
-    val trigger: EdgeLightingTrigger = EdgeLightingTrigger.ALWAYS,
+    val trigger: EdgeLightingTrigger = EdgeLightingTrigger.WHILE_LOADING,
     val glowIntensity: Float = 0.85f
 )
