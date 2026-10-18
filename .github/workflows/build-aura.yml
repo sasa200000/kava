@@ -5,6 +5,9 @@ on:
     paths: ['apps/aura-browser/**', '.github/workflows/build-aura.yml']
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
