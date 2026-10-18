@@ -1,5 +1,6 @@
 package com.example.ui.browser
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,11 +14,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import com.example.data.model.AppLanguage
 import com.example.ui.edgelighting.EdgeLightingOverlay
+
+private const val TAG = "AuraBrowserScreen"
 
 @Composable
 fun BrowserScreen(
@@ -39,6 +45,9 @@ fun BrowserScreen(
     val history by viewModel.history.collectAsState()
     val savedDownloads by viewModel.savedDownloads.collectAsState()
     val navigationRequest by viewModel.navigationRequest.collectAsState()
+
+    // Latest load error (null = no error)
+    var browserError by remember { mutableStateOf<BrowserError?>(null) }
 
     // Sheet states
     val showTabsSheet by viewModel.showTabsSheet.collectAsState()
@@ -106,6 +115,12 @@ fun BrowserScreen(
                             onOpenEdgeLighting = { viewModel.setShowEdgeLightingSheet(true) },
                             onOpenDownloads = { viewModel.setShowDownloadsSheet(true) }
                         )
+                    } else if (browserError != null) {
+                        BrowserErrorView(
+                            error = browserError,
+                            language = language,
+                            onReload = { viewModel.requestNavigate(currentTab.url) }
+                        )
                     } else {
                         BrowserWebView(
                             tab = currentTab,
@@ -117,7 +132,14 @@ fun BrowserScreen(
                             onPageFinished = { url, title -> viewModel.onPageFinished(url, title) },
                             onProgressChanged = { viewModel.onProgressChanged(it) },
                             onTrackerBlocked = { viewModel.onTrackerBlocked() },
-                            onDownloadStarted = { viewModel.addActiveDownload(it) }
+                            onDownloadStarted = { viewModel.addActiveDownload(it) },
+                            onError = { err ->
+                                android.util.Log.e(TAG, "WebView error surfaced: $err")
+                                browserError = err
+                            },
+                            onLoadUrl = { url ->
+                                android.util.Log.d(TAG, "loadUrl called: $url")
+                            }
                         )
                     }
                 }
