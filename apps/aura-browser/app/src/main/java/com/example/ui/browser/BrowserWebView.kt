@@ -49,7 +49,7 @@ fun BrowserWebView(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Keep reference to webview
+    // Create WebView and keep stable reference
     val webView = remember {
         WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -59,58 +59,81 @@ fun BrowserWebView(
         }
     }
 
-    // Configure WebSettings
-    LaunchedEffect(tab.isDesktopMode, tab.isIncognito) {
+    // Configure WebSettings — full Chrome-like support for ALL sites
+    LaunchedEffect(tab.isDesktopMode) {
         val settings = webView.settings
+
+        // Core rendering
         settings.javaScriptEnabled = true
-        settings.domStorageEnabled = !tab.isIncognito
-        settings.databaseEnabled = !tab.isIncognito
+        settings.domStorageEnabled = true
+        settings.databaseEnabled = true
+
+        // Viewport — proper responsive rendering
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
+
+        // Zoom controls
         settings.setSupportZoom(true)
         settings.builtInZoomControls = true
         settings.displayZoomControls = false
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
 
+        // Allow mixed content (HTTP resources on HTTPS pages) — like Chrome
+        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+
+        // Allow content/file access
+        settings.allowContentAccess = true
+        settings.allowFileAccess = true
+
+        // Media playback
+        settings.mediaPlaybackRequiresUserGesture = false
+
+        // Cache
+        settings.cacheMode = WebSettings.LOAD_DEFAULT
+
+        // Popups
+        settings.javaScriptCanOpenWindowsAutomatically = true
+
+        // Third-party cookies
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+
+        // User agent
         if (tab.isDesktopMode) {
             settings.userAgentString = DESKTOP_USER_AGENT
         } else {
-            settings.userAgentString = null // Reset to default mobile UA
-        }
-
-        if (tab.isIncognito) {
-            settings.cacheMode = WebSettings.LOAD_NO_CACHE
-            CookieManager.getInstance().setAcceptCookie(false)
-        } else {
-            settings.cacheMode = WebSettings.LOAD_DEFAULT
-            CookieManager.getInstance().setAcceptCookie(true)
+            settings.userAgentString = null // Use default mobile UA
         }
     }
 
-    // Handle back button inside WebView
+    // Handle system back button
     BackHandler(enabled = webView.canGoBack()) {
         webView.goBack()
     }
 
-    // Listen for navigation requests
+    // React to navigation requests (from address bar or home page shortcuts)
     LaunchedEffect(navigationRequest) {
         if (!navigationRequest.isNullOrBlank()) {
             var urlToLoad = navigationRequest
+
+            // Force HTTPS for http:// URLs
             if (forceHttps && urlToLoad.startsWith("http://")) {
                 urlToLoad = urlToLoad.replaceFirst("http://", "https://")
             }
+
             webView.loadUrl(urlToLoad)
             onNavigationHandled()
         }
     }
 
     DisposableEffect(webView) {
+        // WebViewClient — handles page lifecycle + ad blocking
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
                 view: WebView?,
                 request: WebResourceRequest?
             ): WebResourceResponse? {
                 val reqUrl = request?.url?.toString()
+                // Block known trackers if adBlocker is enabled
                 if (adBlockerEnabled && SecurityEngine.shouldBlockUrl(reqUrl)) {
                     scope.launch(Dispatchers.Main) {
                         onTrackerBlocked()
@@ -129,8 +152,17 @@ fun BrowserWebView(
                 super.onPageFinished(view, url)
                 url?.let { onPageFinished(it, view?.title) }
             }
+
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): Boolean {
+                // Handle deep links / intent URLs
+                return false
+            }
         }
 
+        // WebChromeClient — progress bar + title
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
@@ -142,8 +174,13 @@ fun BrowserWebView(
                 val currentUrl = view?.url ?: ""
                 onPageFinished(currentUrl, title)
             }
+
+            override fun onReceivedIcon(view: WebView?, icon: Bitmap?) {
+                super.onReceivedIcon(view, icon)
+            }
         }
 
+        // File downloads via system DownloadManager
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
             DownloadHelper.startSystemDownload(
                 context = context,
@@ -157,7 +194,7 @@ fun BrowserWebView(
         }
 
         onDispose {
-            // Cleanup if needed
+            // Clean up WebView on dispose
         }
     }
 

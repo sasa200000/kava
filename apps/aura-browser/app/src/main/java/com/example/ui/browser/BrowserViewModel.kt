@@ -104,11 +104,23 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     fun requestNavigate(urlOrQuery: String) {
         val target = formatInputToUrl(urlOrQuery)
+        updateCurrentTabUrl(target)
         _navigationRequest.value = target
     }
 
     fun clearNavigationRequest() {
         _navigationRequest.value = null
+    }
+
+    /** Updates the current tab's displayed URL so BrowserScreen shows the WebView. */
+    private fun updateCurrentTabUrl(newUrl: String) {
+        val idx = _currentTabIndex.value
+        val list = _tabs.value.toMutableList()
+        if (idx in list.indices) {
+            val cur = list[idx]
+            list[idx] = cur.copy(url = newUrl)
+            _tabs.value = list
+        }
     }
 
     private fun formatInputToUrl(input: String): String {
