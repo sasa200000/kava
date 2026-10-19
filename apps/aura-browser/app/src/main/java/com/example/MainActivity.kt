@@ -105,6 +105,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -168,6 +169,9 @@ fun AuraApp() {
     var showSettings by remember { mutableStateOf(false) }
     var showWallet by remember { mutableStateOf(false) }
     var showHomePage by remember { mutableStateOf(true) }
+    var canGoBack by remember { mutableStateOf(false) }
+    var canGoForward by remember { mutableStateOf(false) }
+    var showLogs by remember { mutableStateOf(false) }
 
     val theme = THEMES[themeIdx]
     val cs = darkColorScheme(
@@ -189,7 +193,8 @@ fun AuraApp() {
                 theme=theme,
                 showHomePage=showHomePage,
                 onHomeClick={ showHomePage = true },
-                onSettingsClick={ showSettings = true }
+                onSettingsClick={ showSettings = true },
+                onLogsClick={ showLogs = true }
             )
 
             // Content
@@ -205,7 +210,10 @@ fun AuraApp() {
                 } else {
                     BrowserContent(
                         theme=theme,
-                        onHomeClick={ showHomePage = true }
+                        canGoBack=canGoBack,
+                        canGoForward=canGoForward,
+                        onHomeClick={ showHomePage = true },
+                        onNavigationChanged={ cb, cf -> canGoBack=cb; canGoForward=cf }
                     )
                 }
             }
@@ -214,8 +222,13 @@ fun AuraApp() {
             BottomNav(
                 theme=theme,
                 showHomePage=showHomePage,
+                canGoBack=canGoBack,
+                canGoForward=canGoForward,
                 onHomeToggle={ showHomePage = !showHomePage },
-                onWalletClick={ showWallet = true }
+                onWalletClick={ showWallet = true },
+                onBack={ if(BrowserState.webView?.canGoBack()==true) BrowserState.webView?.goBack() },
+                onForward={ if(BrowserState.webView?.canGoForward()==true) BrowserState.webView?.goForward() },
+                onReload={ BrowserState.webView?.reload() }
             )
         }
 
@@ -259,11 +272,28 @@ object BrowserState {
     fun reload() { webView?.reload() }
     fun goBack() { webView?.goBack() }
     fun goForward() { webView?.goForward() }
+
+    // ── گزارش زنده (Diagnostics) ──
+    val logs = mutableListOf<String>()
+    fun log(msg: String) {
+        val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+        synchronized(logs) {
+            logs.add(0, "[$ts] $msg")
+            if (logs.size > 200) logs.removeAt(logs.size - 1)
+        }
+        android.util.Log.d("AURA_DIAG", msg)
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun BrowserContent(theme: AppTheme, onHomeClick: () -> Unit) {
+fun BrowserContent(
+    theme: AppTheme,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onHomeClick: () -> Unit,
+    onNavigationChanged: (Boolean, Boolean) -> Unit
+) {
     val context = LocalContext.current
     val webView = remember {
         BrowserState.webView ?: WebView(context).apply {
@@ -294,8 +324,8 @@ fun BrowserContent(theme: AppTheme, onHomeClick: () -> Unit) {
 
     var url by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var canGoBack by remember { mutableStateOf(false) }
-    var canGoForward by remember { mutableStateOf(false) }
+    var navBack by remember { mutableStateOf(false) }
+    var navForward by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
@@ -303,18 +333,31 @@ fun BrowserContent(theme: AppTheme, onHomeClick: () -> Unit) {
             BrowserState.webViewClientReady = true
             BrowserState.webView?.let { wv ->
                 wv.webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
+                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                        BrowserState.log("NAV: shouldOverride? ${request?.url} mainFrame=${request?.isForMainFrame}")
+                        return false
+                    }
                     override fun onPageStarted(view: WebView?, u: String?, favicon: android.graphics.Bitmap?) {
                         super.onPageStarted(view, u, favicon)
-                        url = u ?: ""
-                        isLoading = true
+                        BrowserState.log("NAV_START: $u")
+                        url = u ?: ""; isLoading = true
                     }
                     override fun onPageFinished(view: WebView?, u: String?) {
                         super.onPageFinished(view, u)
-                        url = u ?: ""
-                        isLoading = false
-                        canGoBack = view?.canGoBack() ?: false
-                        canGoForward = view?.canGoForward() ?: false
+                        BrowserState.log("NAV_END: $u")
+    url = u ?: ""; isLoading = false
+                        navBack = view?.canGoBack() ?: false
+                        navForward = view?.canGoForward() ?: false
+                        onNavigationChanged(navBack, navForward)
+                    }
+                    override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                        super.onReceivedError(view, errorCode, description, failingUrl)
+                        BrowserState.log("ERR $errorCode: $description [$failingUrl]")
+                    }
+                    override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: android.webkit.WebResourceResponse?) {
+                        super.onReceivedHttpError(view, request, errorResponse)
+                        if (request?.isForMainFrame == true)
+                            BrowserState.log("HTTP_ERR ${errorResponse?.statusCode}: ${request.url}")
                     }
                 }
                 wv.webChromeClient = object : WebChromeClient() {
@@ -325,6 +368,7 @@ fun BrowserContent(theme: AppTheme, onHomeClick: () -> Unit) {
                 }
                 // Download everything
                 wv.setDownloadListener { u, ua, _, _, _ ->
+                    BrowserState.log("DOWNLOAD: $u [UA: ${ua?.take(30)}]")
                     try {
                         val fileName = u.substringAfterLast('/').takeIf { it.contains('.') }
                             ?: (System.currentTimeMillis().toString() + ".bin")
@@ -349,12 +393,15 @@ fun BrowserContent(theme: AppTheme, onHomeClick: () -> Unit) {
             }
         }
 
-        // First load
+        // First load — handle pending URL or home page redirect
         val pUrl = BrowserState.pendingUrl
+        BrowserState.log("LAUNCH: pendingUrl=$pUrl currentUrl=${webView.url}")
         if (pUrl != null) {
             webView.loadUrl(pUrl)
             BrowserState.pendingUrl = null
         } else if (webView.url == null || webView.url == "about:blank") {
+            BrowserState.log("LAUNCH: loading duckduckgo")
+            webView.loadUrl("https://duckduckgo.com")
         }
     }
 
@@ -409,7 +456,7 @@ fun BrowserContent(theme: AppTheme, onHomeClick: () -> Unit) {
 
 // ─────────────────────────── TOP BAR ───────────────────────────
 @Composable
-fun TopBar(theme: AppTheme, showHomePage: Boolean, onHomeClick: () -> Unit, onSettingsClick: () -> Unit) {
+fun TopBar(theme: AppTheme, showHomePage: Boolean, onHomeClick: () -> Unit, onSettingsClick: () -> Unit, onLogsClick: () -> Unit) {
     Row(
         modifier=Modifier.fillMaxWidth().background(Color(theme.surface)).statusBarsPadding().padding(horizontal=8.dp, vertical=8.dp),
         verticalAlignment=Alignment.CenterVertically
@@ -422,6 +469,7 @@ fun TopBar(theme: AppTheme, showHomePage: Boolean, onHomeClick: () -> Unit, onSe
             IconButton(onClick=onHomeClick) { Icon(Icons.Default.Home, "Home", tint=Color(theme.accent)) }
         }
         IconButton(onClick=onSettingsClick) { Icon(Icons.Default.Settings, "Settings", tint=Color(theme.text)) }
+        IconButton(onClick=onLogsClick) { Text("🛠", fontSize=18.sp, color=Color(theme.accent)) }
     }
 }
 
@@ -430,8 +478,13 @@ fun TopBar(theme: AppTheme, showHomePage: Boolean, onHomeClick: () -> Unit, onSe
 fun BottomNav(
     theme: AppTheme,
     showHomePage: Boolean,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
     onHomeToggle: () -> Unit,
-    onWalletClick: () -> Unit
+    onWalletClick: () -> Unit,
+    onBack: () -> Unit,
+    onForward: () -> Unit,
+    onReload: () -> Unit
 ) {
     Row(
         modifier=Modifier.fillMaxWidth().background(Color(theme.surface)).navigationBarsPadding().padding(vertical=8.dp),
@@ -440,13 +493,13 @@ fun BottomNav(
         IconButton(onClick=onHomeToggle) {
             Icon(Icons.Default.Home, "Home", tint=if(showHomePage) Color(theme.accent) else Color.White)
         }
-        IconButton(onClick={ BrowserState.webView?.let { if(it.canGoBack()) it.goBack() } }) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint=Color.White)
+        IconButton(onClick=onBack) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint=if(canGoBack) Color.White else Color(0xFF444444))
         }
-        IconButton(onClick={ BrowserState.webView?.let { if(it.canGoForward()) it.goForward() } }) {
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, "Forward", tint=Color.White)
+        IconButton(onClick=onForward) {
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, "Forward", tint=if(canGoForward) Color.White else Color(0xFF444444))
         }
-        IconButton(onClick={ BrowserState.webView?.reload() }) {
+        IconButton(onClick=onReload) {
             Icon(Icons.Default.Refresh, "Refresh", tint=Color.White)
         }
         IconButton(onClick=onWalletClick) {
@@ -633,6 +686,51 @@ fun SettingsSheet(themeIdx: Int, onThemeChange: (Int) -> Unit, onClose: () -> Un
     }
 }
 
+// ─────────────────────────── LOG VIEWER SHEET ───────────────────────────
+@Composable
+fun LogViewerSheet(theme: AppTheme, onClose: () -> Unit) {
+    var logLines by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            logLines = synchronized(BrowserState.logs) { BrowserState.logs.toList() }
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    Column(
+        modifier=Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement=Arrangement.spacedBy(4.dp)
+    ) {
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Text("🛠 گزارشات", fontSize=20.sp, fontWeight=FontWeight.Bold, color=Color(theme.accent), modifier=Modifier.weight(1f))
+            Button(onClick={
+                synchronized(BrowserState.logs){ BrowserState.logs.clear() }
+                logLines = emptyList()
+            }, colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF30363D))) {
+                Text("پاک کن", color=Color.White, fontSize=12.sp)
+            }
+        }
+        Text("نسخه: 1.0.4 | تاریخ: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}",
+             color=Color(0xFF8B949E), fontSize=11.sp)
+        Spacer(Modifier.height(8.dp))
+        if (logLines.isEmpty()) {
+            Text("هنوز گزارشی نیست. یک سایت باز کنید.", color=Color(0xFF8B949E))
+        } else {
+            logLines.forEach { line ->
+                Text(line, fontSize=10.sp, color=Color(0xFFE0E0E0),
+                     fontFamily=FontFamily.Monospace,
+                     modifier=Modifier.fillMaxWidth())
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick=onClose,
+            modifier=Modifier.fillMaxWidth(),
+            colors=ButtonDefaults.buttonColors(containerColor=Color(theme.accent))
+        ) { Text("بستن", color=Color.Black) }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
 // ─────────────────────────── WALLET SHEET ───────────────────────────
 @Composable
 fun WalletSheet(theme: AppTheme, onClose: () -> Unit) {
@@ -705,6 +803,51 @@ fun WalletSheet(theme: AppTheme, onClose: () -> Unit) {
             }
         }
 
+        Button(
+            onClick=onClose,
+            modifier=Modifier.fillMaxWidth(),
+            colors=ButtonDefaults.buttonColors(containerColor=Color(theme.accent))
+        ) { Text("بستن", color=Color.Black) }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+// ─────────────────────────── LOG VIEWER SHEET ───────────────────────────
+@Composable
+fun LogViewerSheet(theme: AppTheme, onClose: () -> Unit) {
+    var logLines by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            logLines = synchronized(BrowserState.logs) { BrowserState.logs.toList() }
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    Column(
+        modifier=Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement=Arrangement.spacedBy(4.dp)
+    ) {
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Text("🛠 گزارشات", fontSize=20.sp, fontWeight=FontWeight.Bold, color=Color(theme.accent), modifier=Modifier.weight(1f))
+            Button(onClick={
+                synchronized(BrowserState.logs){ BrowserState.logs.clear() }
+                logLines = emptyList()
+            }, colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF30363D))) {
+                Text("پاک کن", color=Color.White, fontSize=12.sp)
+            }
+        }
+        Text("نسخه: 1.0.4 | تاریخ: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}",
+             color=Color(0xFF8B949E), fontSize=11.sp)
+        Spacer(Modifier.height(8.dp))
+        if (logLines.isEmpty()) {
+            Text("هنوز گزارشی نیست. یک سایت باز کنید.", color=Color(0xFF8B949E))
+        } else {
+            logLines.forEach { line ->
+                Text(line, fontSize=10.sp, color=Color(0xFFE0E0E0),
+                     fontFamily=FontFamily.Monospace,
+                     modifier=Modifier.fillMaxWidth())
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick=onClose,
             modifier=Modifier.fillMaxWidth(),
