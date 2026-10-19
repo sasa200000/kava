@@ -613,20 +613,20 @@ fun HomePage(theme: AppTheme, onUrlClick: (String) -> Unit) {
             Text("🖼 تصویر جدید  |  AURA", color=Color(theme.accent), fontSize=13.sp)
         }
 
-        // Quick shortcuts grid
+        // Quick shortcuts grid (name, url, icon)
         val shortcuts = listOf(
-            "Google" to "https://www.google.com",
-            "YouTube" to "https://www.youtube.com",
-            "GitHub" to "https://github.com",
-            "Telegram" to "https://web.telegram.org",
-            "ChatGPT" to "https://chat.openai.com",
-            "Wikipedia" to "https://wikipedia.org",
-            "Reddit" to "https://reddit.com",
-            "X / Twitter" to "https://x.com",
-            "Instagram" to "https://www.instagram.com",
-            "Amazon" to "https://www.amazon.com",
-            "Netflix" to "https://www.netflix.com",
-            "Spotify" to "https://open.spotify.com"
+            Triple("Google", "https://www.google.com", "https://www.google.com/s2/favicons?domain=google.com&sz=128"),
+            Triple("YouTube", "https://www.youtube.com", "https://www.google.com/s2/favicons?domain=youtube.com&sz=128"),
+            Triple("GitHub", "https://github.com", "https://www.google.com/s2/favicons?domain=github.com&sz=128"),
+            Triple("Telegram", "https://web.telegram.org", "https://www.google.com/s2/favicons?domain=telegram.org&sz=128"),
+            Triple("ChatGPT", "https://chat.openai.com", "https://www.google.com/s2/favicons?domain=openai.com&sz=128"),
+            Triple("Wikipedia", "https://wikipedia.org", "https://www.google.com/s2/favicons?domain=wikipedia.org&sz=128"),
+            Triple("Reddit", "https://reddit.com", "https://www.google.com/s2/favicons?domain=reddit.com&sz=128"),
+            Triple("X", "https://x.com", "https://www.google.com/s2/favicons?domain=x.com&sz=128"),
+            Triple("Instagram", "https://www.instagram.com", "https://www.google.com/s2/favicons?domain=instagram.com&sz=128"),
+            Triple("Amazon", "https://www.amazon.com", "https://www.google.com/s2/favicons?domain=amazon.com&sz=128"),
+            Triple("Netflix", "https://www.netflix.com", "https://www.google.com/s2/favicons?domain=netflix.com&sz=128"),
+            Triple("Spotify", "https://open.spotify.com", "https://www.google.com/s2/favicons?domain=spotify.com&sz=128")
         )
 
         // 3-column grid
@@ -639,7 +639,7 @@ fun HomePage(theme: AppTheme, onUrlClick: (String) -> Unit) {
                     modifier=Modifier.fillMaxWidth(),
                     horizontalArrangement=Arrangement.spacedBy(8.dp)
                 ) {
-                    row.forEach { (name, url) ->
+                    row.forEach { (name, url, icon) ->
                         Card(
                             onClick={ onUrlClick(url) },
                             modifier=Modifier.weight(1f),
@@ -648,10 +648,17 @@ fun HomePage(theme: AppTheme, onUrlClick: (String) -> Unit) {
                             )
                         ) {
                             Column(
-                                modifier=Modifier.padding(vertical=16.dp, horizontal=8.dp).fillMaxWidth(),
+                                modifier=Modifier.padding(vertical=14.dp, horizontal=8.dp).fillMaxWidth(),
                                 horizontalAlignment=Alignment.CenterHorizontally
                             ) {
-                                Text(name, color=Color(theme.accent), fontWeight=FontWeight.Bold, fontSize=13.sp, textAlign=TextAlign.Center)
+                                AsyncImage(
+                                    model=icon,
+                                    contentDescription=name,
+                                    modifier=Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)),
+                                    contentScale=ContentScale.Fit
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(name, color=Color(theme.accent), fontWeight=FontWeight.Bold, fontSize=12.sp, textAlign=TextAlign.Center)
                             }
                         }
                     }
@@ -732,6 +739,7 @@ fun SettingsSheet(
 // ─────────────────────────── LOG VIEWER SHEET ───────────────────────────
 @Composable
 fun LogViewerSheet(theme: AppTheme, onClose: () -> Unit) {
+    val context = LocalContext.current
     var logLines by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -752,8 +760,29 @@ fun LogViewerSheet(theme: AppTheme, onClose: () -> Unit) {
                 Text("پاک کن", color=Color.White, fontSize=12.sp)
             }
         }
-        Text("نسخه: 1.0.4 | تاریخ: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}",
+        Text("نسخه: 1.0.5 | تاریخ: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}",
              color=Color(0xFF8B949E), fontSize=11.sp)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Button(onClick={
+                val all = synchronized(BrowserState.logs) { BrowserState.logs.joinToString("\n") }
+                val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clip.setPrimaryClip(android.content.ClipData.newPlainText("aura_logs", all))
+                Toast.makeText(context, "کپی شد! حالا در تلگرام Paste کن", Toast.LENGTH_LONG).show()
+            }, colors=ButtonDefaults.buttonColors(containerColor=Color(theme.accent))) {
+                Text("📋 کپی همه", color=Color.Black, fontSize=12.sp)
+            }
+            Button(onClick={
+                val all = synchronized(BrowserState.logs) { BrowserState.logs.joinToString("\n") }
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, all)
+                }
+                context.startActivity(android.content.Intent.createChooser(intent, "ارسال گزارشات"))
+            }, colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF30363D))) {
+                Text("📤 ارسال", color=Color.White, fontSize=12.sp)
+            }
+        }
         Spacer(Modifier.height(8.dp))
         if (logLines.isEmpty()) {
             Text("هنوز گزارشی نیست. یک سایت باز کنید.", color=Color(0xFF8B949E))
