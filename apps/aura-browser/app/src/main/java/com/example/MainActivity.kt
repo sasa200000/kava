@@ -115,6 +115,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import java.net.URLEncoder
@@ -160,6 +161,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AuraApp() {
     var themeIdx by remember { mutableIntStateOf(0) }
@@ -186,8 +188,8 @@ fun AuraApp() {
             TopBar(
                 theme=theme,
                 showHomePage=showHomePage,
-                onHomeClick={{ showHomePage = true }},
-                onSettingsClick={{ showSettings = true }}
+                onHomeClick={ showHomePage = true },
+                onSettingsClick={ showSettings = true }
             )
 
             // Content
@@ -195,15 +197,15 @@ fun AuraApp() {
                 if (showHomePage) {
                     HomePage(
                         theme=theme,
-                        onUrlClick={{ url ->
+                        onUrlClick={ url ->
                             showHomePage = false
                             BrowserState.loadUrl(url)
-                        }}
+                        }
                     )
                 } else {
                     BrowserContent(
                         theme=theme,
-                        onHomeClick={{ showHomePage = true }}
+                        onHomeClick={ showHomePage = true }
                     )
                 }
             }
@@ -212,22 +214,22 @@ fun AuraApp() {
             BottomNav(
                 theme=theme,
                 showHomePage=showHomePage,
-                onHomeToggle={{ showHomePage = !showHomePage }},
-                onWalletClick={{ showWallet = true }}
+                onHomeToggle={ showHomePage = !showHomePage },
+                onWalletClick={ showWallet = true }
             )
         }
 
         // Settings sheet
         if (showSettings) {
             ModalBottomSheet(
-                onDismissRequest={{ showSettings=false }},
+                onDismissRequest={ showSettings=false },
                 sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
                 containerColor=Color(theme.surface)
             ) {
                 SettingsSheet(
                     themeIdx=themeIdx,
-                    onThemeChange={{ themeIdx=it }},
-                    onClose={{ showSettings=false }}
+                    onThemeChange={ themeIdx=it },
+                    onClose={ showSettings=false }
                 )
             }
         }
@@ -235,11 +237,11 @@ fun AuraApp() {
         // Wallet sheet
         if (showWallet) {
             ModalBottomSheet(
-                onDismissRequest={{ showWallet=false }},
+                onDismissRequest={ showWallet=false },
                 sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
                 containerColor=Color(theme.surface)
             ) {
-                WalletSheet(theme=theme, onClose={{ showWallet=false }})
+                WalletSheet(theme=theme, onClose={ showWallet=false })
             }
         }
     }
