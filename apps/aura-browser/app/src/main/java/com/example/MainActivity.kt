@@ -199,7 +199,7 @@ fun AuraApp() {
                         theme=theme,
                         onUrlClick={ url ->
                             showHomePage = false
-                            BrowserState.loadUrl(url)
+                            BrowserState.pendingUrl = url
                         }
                     )
                 } else {
@@ -254,6 +254,7 @@ fun AuraApp() {
 object BrowserState {
     var webView: WebView? = null
     var webViewClientReady = false
+    var pendingUrl: String? = null
     fun loadUrl(url:String) { webView?.loadUrl(url) }
     fun reload() { webView?.reload() }
     fun goBack() { webView?.goBack() }
@@ -349,8 +350,11 @@ fun BrowserContent(theme: AppTheme, onHomeClick: () -> Unit) {
         }
 
         // First load
-        if (webView.url == null || webView.url == "about:blank") {
-            webView.loadUrl("https://www.google.com")
+        val pUrl = BrowserState.pendingUrl
+        if (pUrl != null) {
+            webView.loadUrl(pUrl)
+            BrowserState.pendingUrl = null
+        } else if (webView.url == null || webView.url == "about:blank") {
         }
     }
 
@@ -455,13 +459,16 @@ fun BottomNav(
 @Composable
 fun HomePage(theme: AppTheme, onUrlClick: (String) -> Unit) {
     var wallpaperIdx by remember { mutableIntStateOf(Random.nextInt(WALLPAPERS.size)) }
+    var searchInput by remember { mutableStateOf("") }
 
     Column(
-        modifier=Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        modifier=Modifier.fillMaxSize()
+            .background(Color(theme.bg))
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment=Alignment.CenterHorizontally
     ) {
-        // Wallpaper hero with search overlay
-        Box(modifier=Modifier.fillMaxWidth().height(280.dp)) {
+        // Full-screen wallpaper
+        Box(modifier=Modifier.fillMaxWidth().height(400.dp)) {
             AsyncImage(
                 model=WALLPAPERS[wallpaperIdx],
                 contentDescription=null,
@@ -469,43 +476,54 @@ fun HomePage(theme: AppTheme, onUrlClick: (String) -> Unit) {
                 contentScale=ContentScale.Crop
             )
             Box(modifier=Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color.Transparent, Color(theme.bg)))
+                Brush.verticalGradient(
+                    colors=listOf(Color.Transparent, Color.Black.copy(alpha=0.7f), Color(theme.bg)),
+                    startY=0f, endY=1200f
+                )
             ))
             Column(
-                modifier=Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                modifier=Modifier.align(Alignment.TopCenter).padding(top=48.dp),
                 horizontalAlignment=Alignment.CenterHorizontally
             ) {
-                Text("Aura Browser", fontSize=32.sp, fontWeight=FontWeight.Bold, color=Color.White)
-                Text("مرورگر ضد تحریم", fontSize=14.sp, color=Color(0xFFB0B8C1))
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value="",
-                    onValueChange={},
-                    modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp),
-                    placeholder={ Text("جستجو کن...", color=Color.White.copy(alpha=0.7f)) },
-                    leadingIcon={ Icon(Icons.Default.Add, null, tint=Color.White) },
-                    singleLine=true,
-                    shape=RoundedCornerShape(28.dp),
-                    colors=OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor=Color.Transparent,
-                        unfocusedBorderColor=Color.Transparent,
-                        focusedContainerColor=Color.Black.copy(alpha=0.55f),
-                        unfocusedContainerColor=Color.Black.copy(alpha=0.45f),
-                        focusedTextColor=Color.White,
-                        unfocusedTextColor=Color.White
-                    ),
-                    readOnly=true,
-                    enabled=false
-                )
+                Text("Aura Browser", fontSize=36.sp, fontWeight=FontWeight.Black, color=Color.White)
+                Text("مرورگر ضد تحریم", fontSize=15.sp, color=Color(0xFFB0B8C1))
             }
         }
 
-        // Wallpaper shuffle button
+        // Working search bar
+        OutlinedTextField(
+            value=searchInput,
+            onValueChange={searchInput=it},
+            modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp, vertical=12.dp),
+            placeholder={ Text("جستجو یا آدرس سایت...", color=Color(0xFF8B949E)) },
+            leadingIcon={ Icon(Icons.Default.Add, null, tint=Color(theme.accent)) },
+            singleLine=true,
+            shape=RoundedCornerShape(28.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=Color(theme.accent),
+                unfocusedBorderColor=Color(0xFF30363D),
+                focusedTextColor=Color.White,
+                unfocusedTextColor=Color.White,
+                focusedContainerColor=Color(theme.surface),
+                unfocusedContainerColor=Color(theme.surface)
+            ),
+            keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
+            keyboardActions=KeyboardActions(onSearch={
+                if (searchInput.isNotBlank()) {
+                    val url = if (searchInput.trim().startsWith("http")) searchInput.trim()
+                    else if (searchInput.trim().contains(".")) "https://" + searchInput.trim()
+                    else "https://duckduckgo.com/?q=" + URLEncoder.encode(searchInput.trim(), "UTF-8")
+                    onUrlClick(url)
+                }
+            })
+        )
+
+        // Shuffle wallpaper button
         TextButton(onClick={ wallpaperIdx = Random.nextInt(WALLPAPERS.size) }) {
-            Text("🖼 تصویر جدید", color=Color(theme.accent))
+            Text("🖼 تصویر جدید  |  AURA", color=Color(theme.accent), fontSize=13.sp)
         }
 
-        // Quick links
+        // Quick shortcuts grid
         val shortcuts = listOf(
             "Google" to "https://www.google.com",
             "YouTube" to "https://www.youtube.com",
@@ -514,24 +532,42 @@ fun HomePage(theme: AppTheme, onUrlClick: (String) -> Unit) {
             "ChatGPT" to "https://chat.openai.com",
             "Wikipedia" to "https://wikipedia.org",
             "Reddit" to "https://reddit.com",
-            "Twitter/X" to "https://x.com"
+            "X / Twitter" to "https://x.com",
+            "Instagram" to "https://www.instagram.com",
+            "Amazon" to "https://www.amazon.com",
+            "Netflix" to "https://www.netflix.com",
+            "Spotify" to "https://open.spotify.com"
         )
-        LazyRow(
-            modifier=Modifier.fillMaxWidth().padding(vertical=16.dp),
-            horizontalArrangement=Arrangement.spacedBy(12.dp),
-            contentPadding=androidx.compose.foundation.layout.PaddingValues(horizontal=16.dp)
+
+        // 3-column grid
+        Column(
+            modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp),
+            verticalArrangement=Arrangement.spacedBy(8.dp)
         ) {
-            items(shortcuts) { (name, url) ->
-                Card(
-                    onClick={ onUrlClick(url) },
-                    modifier=Modifier.width(110.dp),
-                    colors=CardDefaults.cardColors(containerColor=Color(theme.surface))
+            shortcuts.chunked(3).forEach { row ->
+                Row(
+                    modifier=Modifier.fillMaxWidth(),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(
-                        modifier=Modifier.padding(16.dp).fillMaxWidth(),
-                        horizontalAlignment=Alignment.CenterHorizontally
-                    ) {
-                        Text(name, color=Color(theme.accent), fontWeight=FontWeight.Bold, fontSize=14.sp)
+                    row.forEach { (name, url) ->
+                        Card(
+                            onClick={ onUrlClick(url) },
+                            modifier=Modifier.weight(1f),
+                            colors=CardDefaults.cardColors(
+                                containerColor=Color(theme.surface)
+                            )
+                        ) {
+                            Column(
+                                modifier=Modifier.padding(vertical=16.dp, horizontal=8.dp).fillMaxWidth(),
+                                horizontalAlignment=Alignment.CenterHorizontally
+                            ) {
+                                Text(name, color=Color(theme.accent), fontWeight=FontWeight.Bold, fontSize=13.sp, textAlign=TextAlign.Center)
+                            }
+                        }
+                    }
+                    // Fill remaining slots in row with spacers
+                    repeat(3 - row.size) {
+                        Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -600,16 +636,24 @@ fun SettingsSheet(themeIdx: Int, onThemeChange: (Int) -> Unit, onClose: () -> Un
 // ─────────────────────────── WALLET SHEET ───────────────────────────
 @Composable
 fun WalletSheet(theme: AppTheme, onClose: () -> Unit) {
-    var btcPrice by remember { mutableStateOf("...") }
+    var btcPrice by remember { mutableStateOf("در حال دریافت...") }
     LaunchedEffect(Unit) {
-        // Show live BTC price via CoinGecko
         try {
             val client = okhttp3.OkHttpClient()
-            val req = okhttp3.Request.Builder().url("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether&vs_currencies=usd").build()
-            val resp = client.newCall(req).execute()
-            val body = resp.body?.string() ?: "{}"
-            btcPrice = body
-        } catch(e: Exception) { btcPrice = "offline" }
+            val req = okhttp3.Request.Builder()
+                .url("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,usdt,sol,binancecoin,xrp,cardano,dogecoin,tron,polkadot,matic-network,litecoin,shiba-inu,pepe,ton-hunter&vs_currencies=usd&include_24hr_change=true")
+                .build()
+            client.newCall(req).enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
+                    btcPrice = "خطا در اتصال"
+                }
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    btcPrice = response.body?.string() ?: "{}"
+                }
+            })
+        } catch(e: Exception) {
+            btcPrice = "خطا: " + e.message
+        }
     }
 
     Column(
@@ -631,15 +675,33 @@ fun WalletSheet(theme: AppTheme, onClose: () -> Unit) {
         Text(btcPrice, color=Color(theme.accent), fontSize=13.sp)
 
         // Token list
-        val tokens = listOf("BTC","ETH","USDT","BNB","SOL","XRP","ADA","DOGE","TRX","DOT","MATIC","LTC","SHIB","PEPE","TON")
-        tokens.forEach { tk ->
+        val tokens = listOf(
+            "BTC" to "bitcoin", "ETH" to "ethereum", "USDT" to "tether",
+            "SOL" to "solana", "XRP" to "ripple", "ADA" to "cardano",
+            "DOGE" to "dogecoin", "BNB" to "binancecoin", "TRX" to "tron",
+            "DOT" to "polkadot", "LTC" to "litecoin", "TON" to "ton-hunter",
+            "SHIB" to "shiba-inu", "PEPE" to "pepe"
+        )
+        tokens.forEach { (ticker, cgId) ->
             Row(
-                modifier=Modifier.fillMaxWidth().padding(vertical=6.dp),
+                modifier=Modifier.fillMaxWidth().padding(vertical=8.dp),
                 verticalAlignment=Alignment.CenterVertically
             ) {
-                Text(tk, color=Color.White, fontWeight=FontWeight.Bold, modifier=Modifier.width(80.dp))
+                Text(ticker, color=Color(theme.accent), fontWeight=FontWeight.Bold, modifier=Modifier.width(56.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(cgId.replaceFirstChar{ it.uppercase() }, color=Color(0xFF8B949E), fontSize=11.sp)
                 Spacer(Modifier.weight(1f))
-                Text("دریافت / ارسال", color=Color(theme.accent), fontSize=12.sp)
+                Button(
+                    onClick={},
+                    colors=ButtonDefaults.buttonColors(containerColor=Color(theme.accent)),
+                    contentPadding=androidx.compose.foundation.layout.PaddingValues(horizontal=12.dp, vertical=4.dp)
+                ) { Text("دریافت", color=Color.Black, fontSize=11.sp) }
+                Spacer(Modifier.width(6.dp))
+                Button(
+                    onClick={},
+                    colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF30363D)),
+                    contentPadding=androidx.compose.foundation.layout.PaddingValues(horizontal=12.dp, vertical=4.dp)
+                ) { Text("ارسال", color=Color.White, fontSize=11.sp) }
             }
         }
 
