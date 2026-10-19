@@ -172,6 +172,8 @@ fun AuraApp() {
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var showLogs by remember { mutableStateOf(false) }
+    var desktopMode by remember { mutableStateOf(false) }
+    var incognito by remember { mutableStateOf(false) }
 
     val theme = THEMES[themeIdx]
     val cs = darkColorScheme(
@@ -212,6 +214,8 @@ fun AuraApp() {
                         theme=theme,
                         canGoBack=canGoBack,
                         canGoForward=canGoForward,
+                        desktopMode=desktopMode,
+                        incognito=incognito,
                         onHomeClick={ showHomePage = true },
                         onNavigationChanged={ cb, cf -> canGoBack=cb; canGoForward=cf }
                     )
@@ -242,6 +246,10 @@ fun AuraApp() {
                 SettingsSheet(
                     themeIdx=themeIdx,
                     onThemeChange={ themeIdx=it },
+                    desktopMode=desktopMode,
+                    onDesktopModeChange={ desktopMode=it },
+                    incognito=incognito,
+                    onIncognitoChange={ incognito=it },
                     onClose={ showSettings=false }
                 )
             }
@@ -255,6 +263,16 @@ fun AuraApp() {
                 containerColor=Color(theme.surface)
             ) {
                 WalletSheet(theme=theme, onClose={ showWallet=false })
+            }
+        }
+
+        if (showLogs) {
+            ModalBottomSheet(
+                onDismissRequest={ showLogs=false },
+                sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
+                containerColor=Color(theme.surface)
+            ) {
+                LogViewerSheet(theme=theme, onClose={ showLogs=false })
             }
         }
     }
@@ -287,10 +305,14 @@ object BrowserState {
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
 fun BrowserContent(
     theme: AppTheme,
     canGoBack: Boolean,
     canGoForward: Boolean,
+    desktopMode: Boolean,
+    incognito: Boolean,
     onHomeClick: () -> Unit,
     onNavigationChanged: (Boolean, Boolean) -> Unit
 ) {
@@ -321,6 +343,23 @@ fun BrowserContent(
     settings.allowContentAccess = true
     CookieManager.getInstance().setAcceptCookie(true)
     CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+
+    // Desktop mode / incognito apply live
+    LaunchedEffect(desktopMode, incognito) {
+        BrowserState.log("SETTINGS: desktop=$desktopMode incognito=$incognito")
+        if (desktopMode) {
+            settings.userAgentString = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+        } else {
+            settings.userAgentString = null
+        }
+        CookieManager.getInstance().setAcceptCookie(!incognito)
+        if (incognito) {
+            webView.clearCache(true)
+            webView.clearHistory()
+            CookieManager.getInstance().removeAllCookies(null)
+        }
+        if (webView.url?.startsWith("http") == true) webView.reload()
+    }
 
     var url by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -632,10 +671,16 @@ fun HomePage(theme: AppTheme, onUrlClick: (String) -> Unit) {
 
 // ─────────────────────────── SETTINGS SHEET ───────────────────────────
 @Composable
-fun SettingsSheet(themeIdx: Int, onThemeChange: (Int) -> Unit, onClose: () -> Unit) {
+fun SettingsSheet(
+    themeIdx: Int,
+    onThemeChange: (Int) -> Unit,
+    desktopMode: Boolean,
+    onDesktopModeChange: (Boolean) -> Unit,
+    incognito: Boolean,
+    onIncognitoChange: (Boolean) -> Unit,
+    onClose: () -> Unit
+) {
     val theme = THEMES[themeIdx]
-    var desktopMode by remember { mutableStateOf(false) }
-    var incognito by remember { mutableStateOf(false) }
 
     Column(
         modifier=Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState()),
@@ -667,14 +712,14 @@ fun SettingsSheet(themeIdx: Int, onThemeChange: (Int) -> Unit, onClose: () -> Un
             Icon(Icons.Default.DesktopWindows, null, tint=Color(theme.accent))
             Spacer(Modifier.width(8.dp))
             Text("حالت دسکتاپ (Desktop Mode)", color=Color.White, modifier=Modifier.weight(1f))
-            Switch(checked=desktopMode, onCheckedChange={ desktopMode=it })
+            Switch(checked=desktopMode, onCheckedChange={ onDesktopModeChange(it) })
         }
 
         Row(verticalAlignment=Alignment.CenterVertically, modifier=Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Shield, null, tint=Color(theme.accent))
             Spacer(Modifier.width(8.dp))
             Text("مرور خصوصی (Incognito)", color=Color.White, modifier=Modifier.weight(1f))
-            Switch(checked=incognito, onCheckedChange={ incognito=it })
+            Switch(checked=incognito, onCheckedChange={ onIncognitoChange(it) })
         }
 
         Button(
@@ -734,7 +779,8 @@ fun LogViewerSheet(theme: AppTheme, onClose: () -> Unit) {
 // ─────────────────────────── WALLET SHEET ───────────────────────────
 @Composable
 fun WalletSheet(theme: AppTheme, onClose: () -> Unit) {
-    var btcPrice by remember { mutableStateOf("در حال دریافت...") }
+        var btcPrice by remember { mutableStateOf("در حال دریافت...") }
+    var prices by remember { mutableStateOf("در حال دریافت...") }
     LaunchedEffect(Unit) {
         try {
             val client = okhttp3.OkHttpClient()
@@ -746,7 +792,18 @@ fun WalletSheet(theme: AppTheme, onClose: () -> Unit) {
                     btcPrice = "خطا در اتصال"
                 }
                 override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-                    btcPrice = response.body?.string() ?: "{}"
+                    val body = response.body?.string() ?: "{}"
+                    btcPrice = body
+                    try {
+                        val json = org.json.JSONObject(body)
+                        val sb = StringBuilder()
+                        json.keys().forEach { k ->
+                            val v = json.getJSONObject(k)
+                            sb.append(k.uppercase()).append(": $").append(v.getString("usd"))
+                                .append("  (").append(v.optDouble("usd_24h_change", 0.0)).append("%)\n")
+                        }
+                        prices = sb.toString()
+                    } catch (e: Exception) { }
                 }
             })
         } catch(e: Exception) {
@@ -770,7 +827,7 @@ fun WalletSheet(theme: AppTheme, onClose: () -> Unit) {
         }
 
         Text("قیمت لحظه‌ای (USD):", color=Color.White, fontWeight=FontWeight.Bold)
-        Text(btcPrice, color=Color(theme.accent), fontSize=13.sp)
+        Text(prices, color=Color(theme.accent), fontSize=13.sp)
 
         // Token list
         val tokens = listOf(
