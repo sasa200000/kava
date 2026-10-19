@@ -305,8 +305,6 @@ object BrowserState {
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
 fun BrowserContent(
     theme: AppTheme,
     canGoBack: Boolean,
